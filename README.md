@@ -1,62 +1,74 @@
-# Host Intrusion Detection System (HIDS)
+# 🛡️ HIDS — Host Intrusion Detection System
 
-A terminal-based (Textual TUI) host intrusion detection tool that:
-- Baselines and monitors critical system files for tampering (SHA-256 hashing)
-- Watches those files in real time for changes
-- Scans SSH logs for brute-force login attempts
-- Scans shell history for suspicious commands
-- Generates an HTML report and can email alert summaries
+A terminal-based host intrusion detection tool built with Python and [Textual](https://github.com/Textualize/textual). It baselines and monitors critical system files for tampering, watches them in real time, flags SSH brute-force attempts, scans shell history for suspicious commands, and generates HTML security reports — all from a TUI.
 
-Originally built and tested on a Linux VM. This version has been adjusted to also run on macOS (see **What changed for macOS** below) — Linux still works exactly as before.
+![Python](https://img.shields.io/badge/python-3.13-blue) ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-lightgrey)
 
-## Setup (macOS)
+## Origin
 
+Originally built and tested on a Linux VM, relying on Linux-specific APIs — `inotify` for real-time file watching and direct reads of `/var/log/auth.log` for SSH log analysis. It's since been extended to run natively on macOS as well, with the same codebase now supporting both.
+
+## Features
+
+- **File integrity monitoring** — SHA-256 baselining of critical files, with drift detection on demand
+- **Real-time file-change alerts** — via `watchdog` (inotify on Linux, FSEvents on macOS)
+- **SSH brute-force detection** — log file parsing on Linux, unified logging (`log show`) on macOS
+- **Suspicious command scanning** — checks shell history (bash and zsh) against configurable patterns
+- **HTML report generation** — a styled, shareable summary of everything detected
+- **Optional email alerts** — SMTP-based notifications for critical events
+
+## Tech stack
+
+Python · Textual (TUI) · watchdog (cross-platform filesystem events) · smtplib
+
+## Getting started
+
+### macOS
 ```bash
-# 1. Clone your repo, then from inside the project folder:
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-
-# 2. Create your local config from the template and fill in real values
-cp config.example.json config.json
-nano config.json   # or open in any editor
-
-# 3. Run it
+cp config.example.json config.json   # then fill in your own values
 python3 tui.py
 ```
 
-Press `q` to quit. Use **Initialize Baseline** the first time you run it on a new machine — don't carry over a `baseline.json` generated on a different OS, since the exact set of files that exist (e.g. `/etc/shadow`) differs between Linux and macOS.
+### Linux
+Same steps as above — `watchdog` uses inotify under the hood here, so no code changes are needed.
 
-### macOS permissions to know about
-- **SSH log checking**: macOS doesn't write sshd activity to a flat log file — it goes through the unified logging system instead, so this now shells out to `log show`. If it fails, either grant your terminal **Full Disk Access** (System Settings → Privacy & Security → Full Disk Access) or run with `sudo`.
-- **Shell history**: checks `~/.zsh_history` first (macOS's default shell since Catalina), falling back to `~/.bash_history`.
-- **Monitored files**: `/etc/shadow` doesn't exist on macOS (user credentials live in Directory Services, not a flat file) — it'll just be skipped, not an error.
+Press `q` to quit. Use **Initialize Baseline** the first time you run it on a new machine — baselines aren't portable across OSes, since the exact set of monitored files that exist (e.g. `/etc/shadow`) differs between Linux and macOS.
+
+### macOS-specific notes
+- **SSH log checking** shells out to `log show`, since macOS doesn't write sshd activity to a flat file. If it fails, grant your terminal Full Disk Access (System Settings → Privacy & Security → Full Disk Access) or run with `sudo`.
+- **Shell history** checks `~/.zsh_history` first (macOS's default shell), falling back to `~/.bash_history`.
 
 ## What changed for macOS
 
-| Area | Before (Linux-only) | Now |
+| Area | Linux (original) | Cross-platform (current) |
 |---|---|---|
-| Real-time file watching | `inotify_simple` — wraps a Linux-only kernel API, doesn't run on macOS at all | `watchdog` — same code path uses FSEvents on macOS, inotify on Linux |
-| SSH log check | Read `/var/log/auth.log` / `/var/log/secure` directly | Linux: unchanged. macOS: queries `log show` (unified logging), since sshd doesn't write those files there |
-| Suspicious command scan | Only checked `~/.bash_history` | Checks `~/.zsh_history` (macOS default) first, falls back to bash, and correctly parses zsh's timestamped history line format |
+| Real-time file watching | `inotify_simple` — Linux-only | `watchdog` — same code, backed by FSEvents on macOS / inotify on Linux |
+| SSH log check | Reads `/var/log/auth.log` / `/var/log/secure` | Linux: unchanged. macOS: queries `log show` (unified logging) |
+| Suspicious command scan | Only `~/.bash_history` | Checks `~/.zsh_history` first, with correct parsing of zsh's timestamped history format |
 
-I also fixed a pre-existing bug in `email_alerts.py`'s `send_alert()`: it was reading `self.email_config['sender_email']`'s *value* as a dict key (`self.email_config['linuxkaproject@gmail.com']`) instead of just using `'sender_email'`/`'recipient_email'` — that key doesn't exist in the dict, so every real-time email alert was silently throwing a `KeyError` and failing (caught and logged, but never actually sent). `send_summary_report()` didn't have this bug. It's fixed in both now.
+Also fixed a bug in `email_alerts.py` where `send_alert()` was reading the sender's email as a dict *key* instead of using the `sender_email` field — this silently broke every real-time email alert.
 
-## ⚠️ About your Gmail app password
+## Configuration
 
-Your uploaded `config.json` had a live Gmail app password sitting in plain text. That file is **not** included here — it's gitignored, and `config.example.json` (with placeholders) is what gets committed instead. But since that password already left your machine once (in the file you sent me), I'd treat it as burned: **revoke/regenerate it at <https://myaccount.google.com/apppasswords> before you do anything else**, then put the new one only in your local `config.json`.
+Copy `config.example.json` to `config.json` and fill in your own values: monitored files, SSH brute-force threshold, suspicious command patterns, and (optionally) SMTP details for email alerts. `config.json` is gitignored, so your real values never get committed.
 
-## Pushing to GitHub
+## Project structure
 
-From inside the project folder on your Mac:
-
-```bash
-git init
-git add .
-git commit -m "Convert HIDS project for macOS"
-git branch -M main
-git remote add origin https://github.com/Aryaman-vbs/<your-repo-name>.git
-git push -u origin main
+```
+hids-intrusion-detection/
+├── tui.py                  # Entry point — Textual TUI
+├── hids_core.py             # Baselining, integrity checks, SSH log analysis, command scanning
+├── monitor_realtime.py       # Real-time file watching (watchdog)
+├── email_alerts.py           # SMTP email alerts
+├── report_generator.py       # HTML report generation
+├── config.example.json       # Config template
+└── requirements.txt
 ```
 
-If the repo doesn't exist on GitHub yet, create it first (via github.com or `gh repo create`) before the `git remote add` step. Double check `git status` before your first commit — you want to see `config.json`, `venv/`, `baseline.json`, and `__pycache__/` listed as ignored, not staged.
+## Author
+
+**Aryaman Verma**
+[GitHub](https://github.com/Aryaman-vbs) · [LinkedIn](https://www.linkedin.com/in/aryaman-verma-7a9ab4306/)
