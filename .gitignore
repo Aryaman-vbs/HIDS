@@ -1,0 +1,17 @@
+# Virtual environment (not portable between machines/OSes — rebuild with requirements.txt)
+venv/
+env/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Real config with live credentials — copy config.example.json to config.json instead
+config.json
+
+# Generated at runtime, machine-specific
+baseline.json
+hids_report.html
+
+# macOS
+.DS_Store

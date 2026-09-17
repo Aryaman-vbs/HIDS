@@ -1,0 +1,30 @@
+{
+    "monitored_files": [
+        "/etc/passwd",
+        "/etc/group",
+        "/etc/shadow",
+        "/etc/hosts",
+        "/etc/ssh/sshd_config"
+    ],
+    "ssh_threshold": 3,
+    "suspicious_commands": [
+        "rm -rf",
+        "nmap",
+        "chmod 777",
+        "curl http",
+        "wget",
+        "nc -l",
+        "mkfs",
+        "dd if=",
+        ":(){ :|:& };:"
+    ],
+    "email_alerts": false,
+    "email_config": {
+        "smtp_server": "smtp.gmail.com",
+        "smtp_port": 587,
+        "sender_email": "your-email@gmail.com",
+        "sender_password": "your-gmail-app-password",
+        "recipient_email": "your-email@gmail.com"
+    },
+    "system_name": "My HIDS Server"
+}

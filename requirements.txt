@@ -1,0 +1,2 @@
+textual==6.6.0
+watchdog>=4.0.0
